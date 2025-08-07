@@ -1,11 +1,13 @@
 from sqlmodel import Field, Session, SQLModel, create_engine
 from sqlalchemy import Column, DateTime, func
 from datetime import datetime
-from pydantic import EmailStr
+from pydantic import EmailStr, IPvAnyAddress
 from passlib.context import CryptContext
 from urllib.parse import quote_plus
+from typing import Optional
 import uuid
 import os
+
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -44,6 +46,38 @@ class User(SQLModel, table=True):
 
     def verify_password(self, raw_password: str) -> bool:
         return pwd_context.verify(raw_password, self.password_hash)
+
+    def get_full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}"
+
+
+class Token(SQLModel, table=True):
+    __tablename__ = "tokens"
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True, unique=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id")
+    refresh_token: str = Field()
+    access_token: str = Field()
+    is_active: bool = Field(default=False)
+    user_agent: Optional[str] = Field(default="")
+    ip_address: Optional[IPvAnyAddress] = Field(default="")
+
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            nullable=False,
+        ),
+    )
+    updated_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),
+            nullable=False,
+        ),
+    )
 
 
 DB_USER = os.getenv("POSTGRES_USER")
