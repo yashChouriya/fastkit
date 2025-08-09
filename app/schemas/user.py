@@ -26,7 +26,7 @@ class SignupRequestSchema(BaseModel):
     password: str
     password_repeat: str
 
-    @field_validator("username", "email", mode="before")
+    @field_validator("first_name", "last_name", "username", "email", mode="before")
     @classmethod
     def normalize_identifiers(cls, v):
         if v is None:
@@ -70,3 +70,18 @@ class ChangePassRequestSchema(BaseModel):
         if self.new_password != self.new_password_repeat:
             raise ValueError("new password and new password repeat do not match.")
         return self
+
+
+class UpdateProfileRequestSchema(BaseModel):
+
+    first_name: str = Field(max_length=25)
+    last_name: str = Field(max_length=25)
+    username: str = Field(max_length=55)
+
+    @field_validator("first_name", "last_name", "username", mode="before")
+    @classmethod
+    def normalize_identifiers(cls, v):
+        if v is None:
+            return v
+        v = re.sub(r"\s+", "", str(v))  # remove all whitespace
+        return v.lower()
