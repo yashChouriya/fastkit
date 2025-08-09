@@ -20,6 +20,18 @@ class User(SQLModel, table=True):
     is_active: bool = Field(default=False)
     is_email_verified: bool = Field(default=False)
 
+    last_profile_updated_at: datetime = Field(
+        sa_column=Column(
+            DateTime(timezone=True), server_default=func.now(), nullable=False
+        )
+    )
+
+    last_password_updated_at: datetime = Field(
+        sa_column=Column(
+            DateTime(timezone=True), server_default=func.now(), nullable=False
+        )
+    )
+
     created_at: datetime = Field(
         default_factory=datetime.now,
         sa_column=Column(
