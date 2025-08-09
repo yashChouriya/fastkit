@@ -1,8 +1,12 @@
-from sqlmodel import Session, select
-import logging
+from sqlmodel import Session, select, update
 from typing import Union
+from uuid import UUID
+import logging
+
+
 from app.models import Token
 from app.schemas.token import TokenCreationSchema
+
 
 logger = logging.getLogger(__name__)
 
@@ -51,3 +55,59 @@ def create_token(
     except Exception as e:
         logger.error(f"ERR CREATING TOKEN: {e}")
         return None
+
+
+def update_access_token(
+    session: Session, token_instance: Token, access_token: str
+) -> Union[Token, None]:
+    try:
+        token_instance.access_token = access_token
+        session.add(token_instance)
+        session.commit()
+        session.refresh(token_instance)
+
+        return token_instance
+    except Exception as e:
+        logger.error(f"ERR UPDATING ACCESS TOKEN: {e}")
+        return None
+
+
+def deactivate_user_current_token(session: Session, refresh_token: str) -> bool:
+    try:
+        # Lock the row to avoid races if multiple requests hit at once
+        stmt = (
+            select(Token).where(Token.refresh_token == refresh_token).with_for_update()
+        )
+        token: Token | None = session.exec(stmt).one_or_none()
+        if not token or token.is_active is False:
+            return False
+
+        token.is_active = False
+        session.commit()
+        return True
+    except Exception:
+        session.rollback()
+        logger.exception("ERR DEACTIVATING A TOKEN")
+        return False
+
+
+def deactivate_all_tokens_for_user(session: Session, user_id: UUID) -> int:
+    """
+    Returns the number of rows deactivated.
+    """
+    stmt = (
+        update(Token)
+        .where(Token.user_id == user_id, Token.is_active.is_(True))
+        .values(
+            is_active=False,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    try:
+        result = session.exec(stmt)
+        session.commit()
+        return max(result.rowcount or 0, 0)
+    except Exception as e:
+        session.rollback()
+        logger.exception("ERR DEACTIVATING ALL USER TOKENS: %s", e)
+        return 0

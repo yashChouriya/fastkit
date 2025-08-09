@@ -78,3 +78,16 @@ def create_user(session: Session, user_data: UserCreationSchema) -> Union[User, 
     except Exception as e:
         logger.error(f"ERR CREATING USER: {e}")
         return False
+
+
+def update_user_password(
+    session: Session, user: User, new_password: str
+) -> Union[User, bool]:
+    try:
+        user.set_password(new_password)
+        session.commit()
+        session.refresh(user)
+        return True
+    except Exception as e:
+        logger.error(f"ERR UPDATING USER PASSWORD: {e}")
+        return False

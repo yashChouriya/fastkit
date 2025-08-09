@@ -11,7 +11,11 @@ from app.repositories.user_repo import (
     get_user_by_username,
     create_user,
 )
-from app.repositories.token_repo import get_token_by_refresh_token, create_token
+from app.repositories.token_repo import (
+    get_token_by_refresh_token,
+    create_token,
+    update_access_token,
+)
 from app.schemas.token import TokenCreationSchema
 from app.core.jwt import generate_token, decode_token
 
@@ -40,28 +44,54 @@ async def refresh_token(request: Request, session: Session = Depends(get_session
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
-    token_instance = get_token_by_refresh_token(session=session, refresh_token=refresh)
-    if not token_instance or token_instance.access_token != access:
-        return JSONResponse(
-            {"message": "Session expired, Please login again!"},
-            status_code=status.HTTP_401_UNAUTHORIZED,
+    access_token_payload = decode_token(token=access)
+    if access_token_payload or access_token_payload.exp > int(
+        datetime.now().timestamp()
+    ):
+        response = JSONResponse(
+            {"message": "access token is still valid!"},
+            status_code=status.HTTP_200_OK,
+        )
+        response.set_cookie(
+            "access",
+            access,
+            httponly=True,
+            secure=True,
+            samesite="Lax",
         )
 
-    user = get_user_by_id(session=session, user_id=token_instance.user_id)
-    if not user or not user.is_active:
-        return JSONResponse({"message": "Unauthorized"}, status_code=401)
+    else:
+        token_instance = get_token_by_refresh_token(
+            session=session, refresh_token=refresh
+        )
+        if not token_instance or token_instance.access_token != access:
+            return JSONResponse(
+                {"message": "Session expired, Please login again!"},
+                status_code=status.HTTP_401_UNAUTHORIZED,
+            )
 
-    access_token = generate_token(identity=token_instance.user_id, token_type="access")
+        user = get_user_by_id(session=session, user_id=token_instance.user_id)
+        if not user or not user.is_active:
+            return JSONResponse({"message": "Unauthorized"}, status_code=401)
 
-    token_instance.access_token = access_token
-    session.add(token_instance)
-    session.commit()
-    return JSONResponse(
-        {
-            "access": access_token,
-        },
-        status_code=status.HTTP_200_OK,
-    )
+        access_token = generate_token(
+            identity=token_instance.user_id, token_type="access"
+        )
+        updated_token_instance = update_access_token(
+            session=session, token_instance=token_instance, access_token=access_token
+        )
+
+        response = JSONResponse(
+            {"message": "refreshed successfully!"}, status_code=status.HTTP_201_CREATED
+        )
+        response.set_cookie(
+            "access",
+            updated_token_instance.access_token,
+            httponly=True,
+            secure=True,
+            samesite="Lax",
+        )
+    return response
 
 
 @router.post("/login")
