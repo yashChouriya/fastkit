@@ -20,7 +20,7 @@ from app.schemas.token import TokenCreationSchema
 from app.core.jwt import generate_token, decode_token
 
 from app.models import Token, User
-from app.schemas.auth import LoginRequestSchema, SignupRequestSchema, UserCreationSchema
+from app.schemas.user import LoginRequestSchema, SignupRequestSchema, UserCreationSchema
 
 router = APIRouter(prefix="/auth")
 

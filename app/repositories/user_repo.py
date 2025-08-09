@@ -2,8 +2,10 @@ from sqlmodel import Session, select
 import logging
 from typing import Union
 from uuid import UUID
+from datetime import datetime
+
 from app.models import User
-from app.schemas.auth import UserCreationSchema
+from app.schemas.user import UserCreationSchema
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +61,7 @@ def get_user_by_username(session: Session, username: str) -> Union[User, None]:
         return None
 
 
-def create_user(session: Session, user_data: UserCreationSchema) -> Union[User, bool]:
+def create_user(session: Session, user_data: UserCreationSchema) -> bool:
     try:
         user = User(
             first_name=user_data.first_name,
@@ -80,14 +82,26 @@ def create_user(session: Session, user_data: UserCreationSchema) -> Union[User, 
         return False
 
 
-def update_user_password(
-    session: Session, user: User, new_password: str
-) -> Union[User, bool]:
+def update_user_password(session: Session, user: User, new_password: str) -> bool:
     try:
         user.set_password(new_password)
+        user.last_password_updated_at = datetime.now()
+        session.add(user)
         session.commit()
         session.refresh(user)
         return True
     except Exception as e:
         logger.error(f"ERR UPDATING USER PASSWORD: {e}")
+        return False
+
+
+def is_username_available(session: Session, new_username: str, user_id: UUID) -> bool:
+    try:
+        statement = select(User).where(
+            User.username == new_username, User.id != user_id
+        )
+        is_valid = session.exec(statement).first() == None
+        return is_valid
+    except Exception as e:
+        logger.error(f"ERR CHECKING FOR USERNAME ACCEPTANCE: {e}")
         return False
