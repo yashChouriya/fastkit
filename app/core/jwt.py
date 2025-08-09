@@ -3,7 +3,7 @@ import os
 from datetime import datetime, timedelta
 import logging
 from typing import Union, Dict, Literal
-from interface.token import TokenPayload
+from app.schemas.token import TokenPayloadSchema
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ def generate_token(
         access_token_expires = datetime.now() + timedelta(hours=expire_after_hours)
         token = jwt.encode(
             {
-                "identity": identity,
+                "identity": str(identity),
                 "exp": int(access_token_expires.timestamp()),
                 "type": token_type,
             },
@@ -41,7 +41,7 @@ def generate_token(
         return None
 
 
-def decode_token(token: str, algorithm="HS256") -> Union[None | TokenPayload]:
+def decode_token(token: str, algorithm="HS256") -> Union[None | TokenPayloadSchema]:
     try:
         secret = os.getenv("JWT_SECRET", None)
         if not secret:
@@ -49,7 +49,7 @@ def decode_token(token: str, algorithm="HS256") -> Union[None | TokenPayload]:
                 "'JWT_SECRET is not not present in the environment variables!"
             )
         payload = jwt.decode(token=token, algorithms=algorithm, key=secret)
-        return TokenPayload(**payload)
+        return TokenPayloadSchema(**payload)
     except Exception as e:
         logger.error(f"ERR WHILE DECODING TOKEN : {e}")
         return None
